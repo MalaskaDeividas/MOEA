@@ -90,7 +90,7 @@ def parse_instances_from_text(text: str) -> List[Instance]:
             customers.append(Customer(cid=cid, x=x, y=y, demand=d))
             i += 1
 
-        dist = compute_distance_matrix(customers, metric="euclidean")
+        dist = compute_distance_matrix(customers, metric="euclidean", rounding="round")
         instances.append(Instance(iid=iid, best_known=best_known, n=n, p=p, capacity=cap,
                                   customers=customers, dist=dist))
     return instances
@@ -104,18 +104,28 @@ def parse_instances_from_file(path: str) -> List[Instance]:
 # -----------------------------
 # Distances / objective config
 # -----------------------------
-def compute_distance_matrix(customers: List[Customer], metric: str = "euclidean") -> np.ndarray:
+def compute_distance_matrix(customers, metric="euclidean", rounding="round") -> np.ndarray:
     n = len(customers)
     coords = np.array([(c.x, c.y) for c in customers], dtype=float)
     dx = coords[:, None, 0] - coords[None, :, 0]
     dy = coords[:, None, 1] - coords[None, :, 1]
 
     if metric == "euclidean":
-        return np.sqrt(dx * dx + dy * dy)
+        dist = np.sqrt(dx * dx + dy * dy)
     elif metric == "manhattan":
-        return np.abs(dx) + np.abs(dy)
+        dist = np.abs(dx) + np.abs(dy)
     else:
         raise ValueError("metric must be 'euclidean' or 'manhattan'")
+
+    if rounding == "none":
+        return dist
+    if rounding == "floor":
+        return np.floor(dist)
+    if rounding == "ceil":
+        return np.ceil(dist)
+    if rounding == "round":
+        return np.floor(dist + 0.5)  # standard .5 up
+    raise ValueError("rounding must be none/floor/ceil/round")
 
 
 def assignment_cost(dist_ij: float, demand: float, demand_weighted: bool = True) -> float:
@@ -130,7 +140,7 @@ def decode_and_evaluate(
     medians: List[int],
     demand_weighted: bool = True,
     customer_order: str = "desc_demand"  # "desc_demand" | "id"
-) -> Tuple[float, float]:
+):
     """
     Greedy assignment with capacity tracking.
     Always assigns every customer; if no capacity remains, assigns anyway and counts violation.
