@@ -73,7 +73,7 @@ def parse_instances_from_text(text):
             customers.append(Customer(cid=cid, x=x, y=y, demand=d))
             i += 1
 
-        dist = compute_distance_matrix(customers, metric="euclidean", rounding="round")
+        dist = compute_distance_matrix(customers, metric="euclidean", rounding="floor")
         instances.append(Instance(iid=iid, best_known=best_known, n=n, p=p, capacity=cap,
                                   customers=customers, dist=dist))
     return instances
@@ -106,6 +106,7 @@ def compute_distance_matrix(customers, metric="euclidean", rounding="round"):
         return np.ceil(dist)
     if rounding == "round":
         return np.floor(dist + 0.5)  # standard .5 up
+
     raise ValueError("rounding must be none/floor/ceil/round")
 
 
