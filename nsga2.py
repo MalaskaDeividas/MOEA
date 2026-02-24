@@ -1,14 +1,3 @@
-# nsga2_capacitated_pmedian.py
-# ------------------------------------------------------------
-# Modular NSGA-II for Capacitated p-Median (medians are customer sites)
-#
-# Objectives:
-#   f1 = total assignment cost (distance * demand)   [configurable]
-#   f2 = total capacity violation (sum of max(0, load - capacity))
-#
-# Constraint handling uses Deb's rule in dominance comparisons.
-# ------------------------------------------------------------
-
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict
@@ -50,14 +39,8 @@ class Individual:
 # -----------------------------
 # Parsing
 # -----------------------------
-def parse_instances_from_text(text: str) -> List[Instance]:
-    """
-    Parse multiple instances from a single text blob.
-    Each instance:
-      line1: instanceID bestKnown
-      line2: nCustomers pMedians capacity
-      next nCustomers lines: customerID x y demand
-    """
+def parse_instances_from_text(text):
+
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     i = 0
     instances: List[Instance] = []
@@ -101,10 +84,8 @@ def parse_instances_from_file(path: str) -> List[Instance]:
         return parse_instances_from_text(f.read())
 
 
-# -----------------------------
-# Distances / objective config
-# -----------------------------
-def compute_distance_matrix(customers, metric="euclidean", rounding="round") -> np.ndarray:
+#distance /config
+def compute_distance_matrix(customers, metric="euclidean", rounding="round"):
     n = len(customers)
     coords = np.array([(c.x, c.y) for c in customers], dtype=float)
     dx = coords[:, None, 0] - coords[None, :, 0]
@@ -132,9 +113,6 @@ def assignment_cost(dist_ij: float, demand: float, demand_weighted: bool = True)
     return dist_ij * demand if demand_weighted else dist_ij
 
 
-# -----------------------------
-# Decoding: median set -> assignment
-# -----------------------------
 def decode_and_evaluate(
     inst: Instance,
     medians: List[int],
@@ -192,17 +170,9 @@ def decode_and_evaluate(
     return (cost, violation)
 
 
-# -----------------------------
-# NSGA-II core: dominance, sorting, crowding
-# -----------------------------
-def constraint_dominates(a: Individual, b: Individual) -> bool:
-    """
-    Deb's constraint-domination:
-      - Any feasible solution dominates any infeasible solution
-      - If both infeasible: smaller violation dominates
-      - If both feasible: compare objectives normally (here cost only effectively; violation=0)
-    We still keep (cost, violation) for crowding/sorting.
-    """
+# NSGA-II core, dominance, sorting, crowding
+def constraint_dominates(a, b):
+
     cost_a, viol_a = a.objectives
     cost_b, viol_b = b.objectives
 
@@ -220,7 +190,7 @@ def constraint_dominates(a: Individual, b: Individual) -> bool:
     return (cost_a <= cost_b and viol_a <= viol_b) and (cost_a < cost_b or viol_a < viol_b)
 
 
-def fast_non_dominated_sort(pop: List[Individual]) -> List[List[Individual]]:
+def fast_non_dominated_sort(pop):
     S: Dict[int, List[int]] = {}
     n_dom = [0] * len(pop)
     fronts: List[List[int]] = []
@@ -258,7 +228,7 @@ def fast_non_dominated_sort(pop: List[Individual]) -> List[List[Individual]]:
     return [[pop[i] for i in f] for f in fronts]
 
 
-def crowding_distance(front: List[Individual]) -> None:
+def crowding_distance(front):
     if not front:
         return
     m = 2  # number of objectives: (cost, violation)
@@ -279,7 +249,7 @@ def crowding_distance(front: List[Individual]) -> None:
             front[i].crowding += (nextv - prevv) / (maxv - minv)
 
 
-def binary_tournament(pop: List[Individual]) -> Individual:
+def binary_tournament(pop):
     a, b = random.sample(pop, 2)
     if a.rank < b.rank:
         return a
@@ -289,18 +259,13 @@ def binary_tournament(pop: List[Individual]) -> Individual:
     return a if a.crowding > b.crowding else b
 
 
-# -----------------------------
-# Genetic operators (set-based)
-# -----------------------------
 def random_individual(inst: Instance) -> Individual:
     medians = random.sample(range(inst.n), inst.p)
     return Individual(medians=medians, objectives=(1e18, 1e18))
 
 
-def crossover_set(parent1: Individual, parent2: Individual, inst: Instance) -> Tuple[List[int], List[int]]:
-    """
-    Set-based crossover: take some medians from each parent, fill remaining from union/random.
-    """
+def crossover_set(parent1, parent2, inst):
+
     p = inst.p
     s1 = parent1.medians[:]
     s2 = parent2.medians[:]
@@ -314,7 +279,7 @@ def crossover_set(parent1: Individual, parent2: Individual, inst: Instance) -> T
     return child1, child2
 
 
-def mutate_swap(medians: List[int], inst: Instance, pm: float) -> List[int]:
+def mutate_swap(medians, inst, pm):
     if random.random() > pm:
         return medians
     p = inst.p
@@ -328,10 +293,8 @@ def mutate_swap(medians: List[int], inst: Instance, pm: float) -> List[int]:
     return repair_unique(chosen, inst.n, p)
 
 
-def repair_unique(medians: List[int], n: int, p: int) -> List[int]:
-    """
-    Ensure length p and uniqueness; fill missing with random non-selected indices.
-    """
+def repair_unique(medians, n, p):
+
     med = medians[:p]
     seen = set()
     cleaned: List[int] = []
@@ -347,9 +310,6 @@ def repair_unique(medians: List[int], n: int, p: int) -> List[int]:
     return cleaned
 
 
-# -----------------------------
-# NSGA-II solver
-# -----------------------------
 class NSGA2Solver:
     def __init__(
         self,
@@ -369,7 +329,7 @@ class NSGA2Solver:
         self.customer_order = customer_order
         self.seed = seed
 
-    def evaluate(self, inst: Instance, ind: Individual) -> None:
+    def evaluate(self, inst, ind):
         ind.objectives = decode_and_evaluate(
             inst,
             ind.medians,
@@ -377,7 +337,7 @@ class NSGA2Solver:
             customer_order=self.customer_order,
         )
 
-    def run(self, inst: Instance) -> Tuple[List[Individual], Individual]:
+    def run(self, inst):
         random.seed(self.seed)
         np.random.seed(self.seed)
 
@@ -444,10 +404,6 @@ class NSGA2Solver:
         )
         return pareto_front, best_feasible
 
-
-# -----------------------------
-# Convenience runner
-# -----------------------------
 def run_nsga2(
     path: str,
     instance_id: Optional[int] = None,
