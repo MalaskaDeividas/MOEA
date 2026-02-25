@@ -347,6 +347,15 @@ class NSGA2Solver:
         for ind in pop:
             self.evaluate(inst, ind)
 
+        def best_feasible_cost(population):
+            feas = [ind for ind in population if ind.objectives[1] <= 1e-12]
+            if not feas:
+                return None
+            return min(feas, key=lambda ind: ind.objectives[0]).objectives[0]
+
+        history = []
+        history.append(best_feasible_cost(pop))   # gen 0
+
         # rank/crowding init
         fronts = fast_non_dominated_sort(pop)
         for f in fronts:
@@ -393,6 +402,8 @@ class NSGA2Solver:
 
             pop = new_pop
 
+            history.append(best_feasible_cost(pop))  # after this generation
+
         # final nondominated front
         fronts = fast_non_dominated_sort(pop)
         pareto_front = fronts[0]
@@ -403,13 +414,9 @@ class NSGA2Solver:
             key=lambda ind: ind.objectives[0],
             default=min(pop, key=lambda ind: (ind.objectives[1], ind.objectives[0]))
         )
-        return pareto_front, best_feasible
+        return pareto_front, best_feasible, history
 
-def run_nsga2(
-    path: str,
-    instance_id: Optional[int] = None,
-    **solver_kwargs
-) -> None:
+def run_nsga2(path: str, instance_id: Optional[int] = None, **solver_kwargs):
     instances = parse_instances_from_file(path)
     if instance_id is not None:
         instances = [inst for inst in instances if inst.iid == instance_id]
@@ -418,10 +425,10 @@ def run_nsga2(
 
     solver = NSGA2Solver(**solver_kwargs)
 
-
+    histories = {}
 
     for inst in instances:
-        front, best = solver.run(inst)
+        front, best, history = solver.run(inst)
         cost, viol = best.objectives
 
         print(f"\nInstance {inst.iid} (best-known: {inst.best_known})")
@@ -430,10 +437,15 @@ def run_nsga2(
         print(f"  Medians (0-based indices): {best.medians}")
         print(f"  Pareto front size: {len(front)}")
 
-        # show a few front points
         front_sorted = sorted(front, key=lambda ind: (ind.objectives[1], ind.objectives[0]))
         print("  Front sample (cost, violation):")
         for ind in front_sorted[:min(10, len(front_sorted))]:
             print(f"    ({ind.objectives[0]:.4f}, {ind.objectives[1]:.4f})")
+
+        histories[inst.iid] = history
+
+    if instance_id is not None:
+        return histories[instance_id]
+    return histories
 
 
