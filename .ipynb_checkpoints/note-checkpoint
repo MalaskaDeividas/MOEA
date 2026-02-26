@@ -1,0 +1,48 @@
+
+(a) Objectives: how they were considered
+Objective formulation used in your current code (what you’ve implemented)
+
+You’re solving a capacitated p-median-type problem where a solution is a set of p facility locations (medians) chosen among customer sites, and customers are assigned to open facilities.
+
+You evaluated each candidate median set with two objectives:
+
+Cost
+
+f1(x) = Σ_i distance(i, assigned_median(i))
+(You set demand_weighted=False to match the benchmark scale; demands are used only for capacity feasibility.)
+
+Distance is Euclidean floored to integer, i.e. floor(sqrt(dx^2 + dy^2)).
+
+Capacity violation
+
+f2(x) = Σ_m max(0, load(m) − capacity)
+where load(m) is total assigned demand to median m.
+
+This makes it a bi-objective constrained optimization:
+
+feasible solutions have f2 = 0
+
+infeasible solutions have f2 > 0
+
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+
+
+Capacity constraint: how it was addressed
+What your current decoder does (be explicit)
+
+Your evaluation uses a greedy assignment decoder:
+
+Customers are processed in desc_demand order (largest demand first)
+
+Each customer is assigned to the nearest feasible median (one that still has capacity)
+
+If none has remaining capacity, assign to the nearest anyway and count violation later
+
+So constraint handling has two layers:
+
+Decoder tries to satisfy capacity (feasibility-first assignment choice)
+
+Any remaining overload is measured as violation and minimized via the algorithm
